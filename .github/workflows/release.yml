@@ -25,7 +25,9 @@ jobs:
         run: |
           url="https://github.com/${{ github.repository }}/archive/refs/tags/$GITHUB_REF_NAME.tar.gz"
           echo "URL=$url" >> "$GITHUB_ENV"
-          echo "SHA=$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          # A file, not a pipe: a failed curl in $(...) would hash nothing and publish e3b0c442....
+          curl -fsSL -o tag.tar.gz "$url"
+          echo "SHA=$(sha256sum tag.tar.gz | cut -d' ' -f1)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           repository: lejmr/homebrew-tap
@@ -37,5 +39,6 @@ jobs:
           sed -i -E "s|^(  url \").*(\")|\1$URL\2|; s|^(  sha256 \").*(\")|\1$SHA\2|" Formula/herdr-lid-awake.rb
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git diff --quiet && { echo "tap already has $VERSION"; exit 0; }
           git commit -am "herdr-lid-awake $VERSION"
           git push

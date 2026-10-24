@@ -29,6 +29,7 @@ case "$*" in
   "-g") cat "$FAKE_FIX/pmset-g-sleep-$([ "$(cat "$FAKE_DIR/sleepdisabled")" = 1 ] && echo disabled || echo enabled).txt" ;;
   "-g assertions") cat "$FAKE_FIX/assertions-cup-$(cat "$FAKE_DIR/cup").txt" ;;
   "-g assertionslog") echo $$ > "$FAKE_DIR/logpid"
+    while [ -e "$FAKE_DIR/hold" ]; do sleep 0.02; done   # lets a test delay the first line
     echo "Showing all currently held IOKit power assertions"
     exec cat "$FAKE_DIR/log" ;;
   "disablesleep "*) echo "$2" > "$FAKE_DIR/sleepdisabled"; echo "disablesleep $2" >> "$FAKE_DIR/calls" ;;
@@ -98,6 +99,7 @@ test_6() {
   start && emit on "$CREATED" && within_1s 1 || return 1
   kill -TERM "$W"; wait "$W" 2>/dev/null; W=
   within_1s 0 || return 1
+  [ ! -e "$T/state/holding" ] || { echo "marker left behind" >&2; return 1; }
   sleep 0.2
   pgrep -f "$T/pmset" >&2 && { echo "leftover pmset/script" >&2; return 1; }
   return 0
@@ -224,10 +226,17 @@ test_x8() {
   "$BIN" bogus >/dev/null 2>&1; [ $? = 2 ]
 }
 
+test_x9() {
+  # The cup turns on after the startup check but before the stream's first line: no Herdr line follows.
+  touch "$T/hold"
+  start; echo on > "$T/cup"; rm -f "$T/hold"
+  within_1s 1
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3 x4 x5 x6 x7 x8; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3 x4 x5 x6 x7 x8 x9; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -252,3 +261,4 @@ exit $fail
 # row x6: install-sudoers fails when sudo does not use the file
 # row x7: a second watcher refuses to start
 # row x8: --help prints usage, exit 0
+# row x9: cup on between startup check and first stream line is seen

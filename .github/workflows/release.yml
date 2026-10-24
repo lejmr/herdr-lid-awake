@@ -20,13 +20,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           awk -v h="## $VERSION " 'index($0, h) == 1 { p = 1; next } /^## / { p = 0 } p' CHANGELOG.md > notes.md
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
+          # A rerun after a later step failed must not stop here.
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
       - name: Checksum of the tag tarball
         run: |
           url="https://github.com/${{ github.repository }}/archive/refs/tags/$GITHUB_REF_NAME.tar.gz"
           echo "URL=$url" >> "$GITHUB_ENV"
           # A file, not a pipe: a failed curl in $(...) would hash nothing and publish e3b0c442....
-          curl -fsSL -o tag.tar.gz "$url"
+          # Right after a tag is pushed (or re-pushed) the archive can 404 for a few minutes.
+          curl -fsSL --retry 10 --retry-all-errors --retry-delay 30 -o tag.tar.gz "$url"
           echo "SHA=$(sha256sum tag.tar.gz | cut -d' ' -f1)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:

@@ -207,10 +207,27 @@ test_x6() {
   grep -q includedir "$T/err" || { echo "no hint: $(cat "$T/err")" >&2; return 1; }
 }
 
+test_x7() {
+  # A second watcher must not start (it would adopt the first one's marker and release it too early).
+  start && emit on "$CREATED" && within_1s 1 || return 1
+  "$BIN" > "$T/out2" 2>&1 9>&- & p=$!
+  for _ in $(seq 40); do kill -0 "$p" 2>/dev/null || break; sleep 0.05; done
+  if kill -0 "$p" 2>/dev/null; then kill -TERM "$p"; wait "$p" 2>/dev/null; echo "second watcher kept running" >&2; return 1; fi
+  wait "$p"; rc=$?; out=$(cat "$T/out2")
+  [ "$rc" != 0 ] && [ "$out" = "herdr-lid-awake already running (pid $W)" ] || { echo "rc=$rc out=$out" >&2; return 1; }
+  kill -0 "$W" && emit off "$RELEASED" && within_1s 0
+}
+
+test_x8() {
+  [ "$("$BIN" --help)" = "usage: herdr-lid-awake [--version | sudoers | install-sudoers]" ] || return 1
+  "$BIN" -h >/dev/null || return 1
+  "$BIN" bogus >/dev/null 2>&1; [ $? = 2 ]
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3 x4 x5 x6; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3 x4 x5 x6 x7 x8; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -233,3 +250,5 @@ exit $fail
 # row x4: under sudo the rule names SUDO_USER, never root
 # row x5: sudoers file is per uid
 # row x6: install-sudoers fails when sudo does not use the file
+# row x7: a second watcher refuses to start
+# row x8: --help prints usage, exit 0

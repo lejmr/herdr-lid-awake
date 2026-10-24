@@ -48,6 +48,9 @@ case $1 in
       echo "but sudo does not use it: does /etc/sudoers have '#includedir /etc/sudoers.d'?" >&2; rc=1
     fi
     rm -f "$tmp"; exit $rc ;;
+  -h|--help)
+    echo "usage: herdr-lid-awake [--version | sudoers | install-sudoers]"
+    exit ;;
   "") ;;
   *)
     echo "usage: herdr-lid-awake [--version | sudoers | install-sudoers]" >&2
@@ -88,11 +91,21 @@ apply() {
 
 release() {
   trap - EXIT INT TERM HUP
+  rm -f "$PIDFILE"
   [ $owned = 1 ] && run_sudo disablesleep 0 && rm -f "$MARKER"
   # ponytail: kills every child of this shell; fine while `script` is the only one.
   pkill -P $$ 2>/dev/null
   exit 0
 }
+# One watcher at a time: a second would adopt the first one's marker and clear sleep too early.
+# ponytail: pid file, racy if two start in the same millisecond; lockf(1) if that ever happens.
+PIDFILE=$STATE/pid
+if p=$(cat "$PIDFILE" 2>/dev/null) && ps -p "$p" -o command= 2>/dev/null | grep -q herdr-lid-awake; then
+  echo "herdr-lid-awake already running (pid $p)" >&2
+  exit 1
+fi
+mkdir -p "$STATE" 2>/dev/null && echo $$ > "$PIDFILE"
+
 trap release EXIT INT TERM HUP
 
 "$SUDO" -n -l /usr/bin/pmset disablesleep 1 >/dev/null 2>&1 || warn

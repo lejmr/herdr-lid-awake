@@ -38,9 +38,11 @@ sleep_disabled() { "$PMSET" -g | grep -q 'SleepDisabled[[:space:]]*1'; }
 # ponytail: a watcher flipping SleepDisabled between the read and the write is undone; only
 # install-sudoers with a running watcher and a cup change in that instant could hit it.
 rule_works() {
-  local v=0
+  local v=0 as=()
   sleep_disabled && v=1
-  "$SUDO" -k -n "$PMSET" disablesleep $v >/dev/null 2>&1
+  # Under `sudo herdr-lid-awake install-sudoers` this runs as root, who needs no rule: ask as the user.
+  [ "$(id -u)" = 0 ] && [ -n "${user:-}" ] && as=("$SUDO" -u "$user")
+  "${as[@]}" "$SUDO" -k -n "$PMSET" disablesleep $v >/dev/null 2>&1
 }
 
 case $1 in

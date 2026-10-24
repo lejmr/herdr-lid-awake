@@ -67,6 +67,7 @@ While it holds `disablesleep 1`, the watcher keeps a marker file in `~/.local/st
 - A timed cup (`Herdr caffeine on --for 2h`) restores sleep when it ends: the assertion is released, which is a `Released` line like any other.
 - If another tool (Amphetamine, say) set `SleepDisabled 1` first, the watcher does not take over. If that tool clears it while the cup is on, the lid sleeps again until the next cup change.
 - The cup "until agents finish" (right-click the cup) works with the lid closed: when the last agent finishes, the watcher restores sleep and, since the lid is already closed, puts the Mac to sleep with `pmset sleepnow`. macOS alone would not: it sleeps on the lid-close event, which has passed (the author of [herdr-gpui PR 337](https://github.com/penso/herdr-gpui/pull/337) saw that in their test). With an external display attached the Mac is in use with its lid closed, so it stays awake.
+- Stopping the watcher (`brew services stop`) with the cup on and the lid closed restores sleep, but does not put the Mac to sleep.
 - No cutoff on low battery. Mind the charge.
 - Any Herdr UI process holding the assertion counts: with two instances, sleep comes back when the last cup goes off.
 - A Mac with its lid closed in a bag does not cool well. Turn the cup off before you pack it.

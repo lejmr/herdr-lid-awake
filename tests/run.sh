@@ -46,14 +46,16 @@ case $(cat "$FAKE_DIR/lid") in
 esac
 printf '      "AppleClamshellCausesSleep" = %s\n      "AppleClamshellState" = %s\n' "$c" "$s"
 FAKE
-  # Like sudo for an admin on a real Mac: `(ALL) ALL` makes `-l` succeed for any command, and
+  # Like sudo for an admin on a real Mac (root, via a fake id, needs no rule; -u USER drops to the user): `(ALL) ALL` makes `-l` succeed for any command, and
   # a password typed for `sudo install` stays cached; only -k ignores it. sudo_fail = no NOPASSWD rule.
   cat > "$T/sudo" <<'FAKE'
 #!/bin/bash
+[ "$1" = -u ] && { export FAKE_AS=$2; shift 2; exec "$@"; }
 k=0; [ "$1" = -k ] && { k=1; shift; }
 if [ "$1" = -n ]; then
   shift
   [ "$1" = -l ] && exit 0
+  [ "$(id -u)" = 0 ] && [ -z "${FAKE_AS:-}" ] && exec "$@"   # root needs no rule
   if [ -e "$FAKE_DIR/sudo_fail" ]; then [ $k = 0 ] && [ -e "$FAKE_DIR/cached" ] || exit 1; fi
   exec "$@"
 fi
@@ -284,10 +286,27 @@ test_x12() {
   [ "$(cat "$T/out")" = "sudoers rule missing: run herdr-lid-awake install-sudoers" ] || { echo "out: $(cat "$T/out")" >&2; return 1; }
 }
 
+test_x13() {
+  # `sudo herdr-lid-awake install-sudoers`: root passes any sudo, so the check must ask as SUDO_USER.
+  mkdir "$T/fakeid"
+  cat > "$T/fakeid/id" <<'ID'
+#!/bin/bash
+[ "$1" = -u ] && echo 0 || echo root
+ID
+  chmod +x "$T/fakeid/id"
+  touch "$T/sudo_fail"
+  PATH=$T/fakeid:$PATH SUDO_USER=jana SUDO_UID=501 "$BIN" install-sudoers >/dev/null 2>"$T/err" &&
+    { echo "exit 0 as root although the rule does not work for jana" >&2; return 1; }
+  grep -q includedir "$T/err" || { echo "no hint: $(cat "$T/err")" >&2; return 1; }
+  # Control: with a working rule the same call succeeds.
+  rm "$T/sudo_fail"
+  PATH=$T/fakeid:$PATH SUDO_USER=jana SUDO_UID=501 "$BIN" install-sudoers >/dev/null
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12 16 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 16 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -317,3 +336,4 @@ exit $fail
 # row x10: PreventSystemSleep counts, HerdrHelper does not
 # row x11: cup off with the lid open or an external display does not sleep
 # row x12: missing rule on an admin account is reported at start
+# row x13: install-sudoers under sudo checks the rule as SUDO_USER

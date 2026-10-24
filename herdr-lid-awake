@@ -58,8 +58,12 @@ apply() {
   if cup_on; then
     # Leave a SleepDisabled 1 someone else set alone; only clear what we set.
     if [ $owned = 0 ] && ! sleep_disabled; then
-      mkdir -p "$STATE" && : > "$MARKER"
-      if run_sudo disablesleep 1; then owned=1; log awake; else rm -f "$MARKER"; fi
+      # No marker, no disablesleep: a kill -9 would leave sleep off for good.
+      if mkdir -p "$STATE" 2>/dev/null && : > "$MARKER"; then
+        if run_sudo disablesleep 1; then owned=1; log awake; else rm -f "$MARKER"; fi
+      else
+        echo "cannot write $MARKER, not disabling sleep" >&2
+      fi
     fi
   elif [ $owned = 1 ]; then
     run_sudo disablesleep 0 && owned=0 && rm -f "$MARKER" && log sleeps

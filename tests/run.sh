@@ -166,10 +166,18 @@ test_x2() {
   emit off "$RELEASED"; within_1s 0
 }
 
+test_x3() {
+  # State dir not writable: without a marker a kill -9 could never be healed, so do not disable sleep.
+  mkdir "$T/ro"; chmod 555 "$T/ro"; export HERDR_LID_AWAKE_STATE_DIR=$T/ro/state
+  start && emit on "$CREATED" && sleep 0.5 || return 1
+  [ "$(sd)" = 0 ] && [ -z "$(calls)" ] || { echo "sd=$(sd) calls: $(calls)" >&2; return 1; }
+  [ -s "$T/out" ] || { echo "no message" >&2; return 1; }
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -188,3 +196,4 @@ exit $fail
 # row 12: script is lint-clean
 # row x1: install-sudoers does not re-run itself through PATH
 # row x2: stale marker with sleep enabled is dropped, cup on disables sleep
+# row x3: unwritable state dir means no disablesleep, with a message

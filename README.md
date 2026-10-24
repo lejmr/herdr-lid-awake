@@ -82,12 +82,6 @@ sudo rm /etc/sudoers.d/herdr-lid-awake-$(id -u)
 rm -r ~/.local/state/herdr-lid-awake
 ```
 
-## AI disclosure
-
-I wanted my agents to keep running while the laptop is closed, and the cup in Herdr UI looked like the switch for it. It is not, macOS has the last word on a closed lid. Before writing anything I had Claude Code go through the Herdr UI issues and PRs. Someone had already built this into the app, and the maintainer closed it for reasons I agree with. So I asked for the smallest thing that does it from the outside.
-
-Claude Code wrote the script and the formula in one session; I tested it on my MacBook. It is small enough to read in two minutes, and you should, since it runs `sudo`.
-
 ## Contributing
 
 Something broken, or a better way than `pmset disablesleep`? Open an issue or a pull request, I am happy to be told there is a simpler way. `bash tests/run.sh` runs the tests, see [DEVELOPMENT.md](DEVELOPMENT.md).

@@ -60,7 +60,8 @@ esac
 owned=0
 warned=0
 
-cup_on() { "$PMSET" -g assertions | grep -q '(Herdr).*PreventUserIdleSystemSleep'; }
+# keep_awake_scope "system" may hold PreventSystemSleep instead (unverified); (Herdr) stays exact.
+cup_on() { "$PMSET" -g assertions | grep -Eq '\(Herdr\).*Prevent(UserIdle)?SystemSleep'; }
 sleep_disabled() { "$PMSET" -g | grep -q 'SleepDisabled[[:space:]]*1'; }
 log() { echo "$(date '+%F %T') lid: $1"; }
 

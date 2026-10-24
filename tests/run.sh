@@ -233,10 +233,18 @@ test_x9() {
   within_1s 1
 }
 
+test_x10() {
+  # System scope may hold PreventSystemSleep instead (derived fixture); HerdrHelper is not the cup.
+  start && emit on-system "$CREATED" && within_1s 1 || return 1
+  emit off "$RELEASED"; within_1s 0 || return 1
+  emit on-helper "$CREATED"; sleep 0.5
+  [ "$(sd)" = 0 ] || { echo "HerdrHelper counted as the cup" >&2; return 1; }
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3 x4 x5 x6 x7 x8 x9; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -262,3 +270,4 @@ exit $fail
 # row x7: a second watcher refuses to start
 # row x8: --help prints usage, exit 0
 # row x9: cup on between startup check and first stream line is seen
+# row x10: PreventSystemSleep counts, HerdrHelper does not

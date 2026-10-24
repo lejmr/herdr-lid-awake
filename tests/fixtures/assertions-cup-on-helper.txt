@@ -1,0 +1,28 @@
+# DERIVED from assertions-cup-on.txt: process renamed HerdrHelper (must not count as the cup).
+2026-10-24 11:43:11 +0200 
+Assertion status system-wide:
+   BackgroundTask                 0
+   ApplePushServiceTask           0
+   UserIsActive                   1
+   PreventUserIdleDisplaySleep    1
+   SoftwareUpdateTask             0
+   PreventSystemSleep             0
+   PreventSystemSleepSecurityIndicator 0
+   ExternalMedia                  0
+   PreventUserIdleSystemSleep     1
+   NetworkClientActive            0
+Listed by owning process:
+   pid 35009(mdsync): [0x000e1f74000b97ce] 02:02:37 BackgroundTask named: "com.apple.metadata.mds.scan"  
+   pid 503(backupd): [0x000e1f08000197ab] 02:04:25 PreventUserIdleSystemSleep named: "Backup Job"  
+   pid 10444(HerdrHelper): [0x000e3c3000019b64] 00:00:01 PreventUserIdleSystemSleep named: "Herdr keeps the display awake"  
+   pid 10444(HerdrHelper): [0x000e3c3000059b63] 00:00:01 PreventUserIdleDisplaySleep named: "Herdr keeps the display awake"  
+   pid 356(powerd): [0x000e3ba100019afc] 00:02:24 PreventUserIdleSystemSleep named: "Powerd - Prevent sleep while display is on"  
+   pid 412(WindowServer): [0x000e3ba100099afb] 00:00:00 UserIsActive named: "com.apple.iohideventsystem.queue.tickle serviceID:100000cd1 service:AppleMultitouchDevice product:Apple Internal Keyboard / Trackpad eventType:11"  
+	Timeout will fire in 120 secs Action=TimeoutActionRelease
+   pid 88108(caffeinate): [0x000e3c0300019b58] 00:00:46 PreventUserIdleSystemSleep named: "caffeinate command-line tool"  
+	Details: caffeinate asserting for 300 secs
+	Localized=THE CAFFEINATE TOOL IS PREVENTING SLEEP.
+	Timeout will fire in 253 secs Action=TimeoutActionRelease
+   pid 783(sharingd): [0x000e3c1200019b5b] 00:00:31 PreventUserIdleSystemSleep named: "Handoff"  
+   pid 33929(Claude): [0x000caf0e000184e5] 29:18:02 NoIdleSleepAssertion named: "Electron"  
+No kernel assertions.

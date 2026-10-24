@@ -36,9 +36,9 @@ The permanent requirement set. A change is done when every row holds.
 | 10 | NEG: `install-sudoers` never installs an invalid rule | fake visudo fails | `sudo install` never called, exit not 0 | `tests/run.sh` |
 | 11 | Tap install on a fresh macOS | `brew install`, `brew test`, `brew audit --strict --online` | all pass | tap CI (`homebrew-tap/.github/workflows/ci.yml`) |
 | 12 | Script is lint-clean | `shellcheck herdr-lid-awake tests/*.sh` | no output | `tests/run.sh`, CI |
-| 13 | Real cup toggles real sleep | real Herdr UI, watcher started by `brew services`; click the cup, `pmset -g \| grep SleepDisabled`, click again | `1`, then `0`; log has `lid: awake`, `lid: sleeps` | maintainer |
-| 14 | Lid closed with cup on, Mac stays reachable | cup on, close the lid on battery, `ping` the Mac from another device for a minute | replies keep coming | maintainer |
-| 15 | Lid closed with cup off, Mac sleeps; `kill -9` heals | cup off, close the lid; then cup on, `kill -9` the watcher, wait for `brew services` to restart it, cup off | pings stop; after the restart `SleepDisabled 0` | maintainer |
+| 13 | Cup toggles real sleep | Real Mac: `brew install lejmr/tap/herdr-lid-awake`, `herdr-lid-awake install-sudoers`, `brew services start herdr-lid-awake`; cup on/off, `pmset -g \| grep SleepDisabled` | `1`, then `0` | maintainer |
+| 14 | Lid closed on battery, cup on, loop keeps running | Real Mac on battery: cup on, lid closed 5 min, a `while :; do date >> ~/lid.log; sleep 5; done` loop running | no gap > 10 s in `~/lid.log` | maintainer |
+| 15 | System scope also disables sleep | `keep_awake_scope = "system"` (Settings or `Herdr config set status_bar.keep_awake_scope system`), cup off then on | `SleepDisabled 1` | maintainer |
 
 ## Release
 
@@ -50,10 +50,10 @@ The permanent requirement set. A change is done when every row holds.
 
 ## Manual batch (rows 13 to 15)
 
-Run on a MacBook with Herdr UI, after `brew upgrade herdr-lid-awake` and `brew services restart herdr-lid-awake`.
+Run on a MacBook with Herdr UI.
 
 | Row | Do | Good = |
 | --- | --- | --- |
-| 13 | Cup on, `pmset -g \| grep SleepDisabled`. Cup off, again. `tail -2 $(brew --prefix)/var/log/herdr-lid-awake.log`. | `1`, then `0`; the two log lines `lid: awake` and `lid: sleeps` |
-| 14 | Cup on, close the lid on battery, `ping <mac>.local` from a phone or another computer for a minute. Open the lid, cup off. | Replies the whole time; afterwards `SleepDisabled 0` |
-| 15 | Cup off, close the lid, ping. Open it. Cup on, `kill -9 $(pgrep -f herdr-lid-awake)`, wait a few seconds, cup off. | Pings stop within a minute or so; after the restart and cup off, `SleepDisabled 0` |
+| 13 | `brew install lejmr/tap/herdr-lid-awake`, `herdr-lid-awake install-sudoers`, `brew services start herdr-lid-awake`. Cup on, `pmset -g \| grep SleepDisabled`. Cup off, again. | `1`, then `0` |
+| 14 | On battery: cup on, close the lid for 5 minutes with `while :; do date >> ~/lid.log; sleep 5; done` running. Open the lid, check `~/lid.log`. | No gap longer than 10 s in `~/lid.log` |
+| 15 | Set `keep_awake_scope = "system"` (Settings, or `Herdr config set status_bar.keep_awake_scope system`). Cup off, then on. `pmset -g \| grep SleepDisabled`. | `SleepDisabled 1` |

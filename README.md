@@ -27,7 +27,7 @@ The cup holds a power assertion, the same one `caffeinate` holds. macOS ignores 
 - **Within a second.** It follows the assertion log, nothing is polled.
 - **Leaves others alone.** It only clears a `SleepDisabled 1` it set itself. If Amphetamine or you disabled sleep first, it does not touch it.
 - **Gives sleep back.** Cup off, Herdr quit or crashed, watcher stopped or killed: sleep is restored.
-- **One bash script.** About 90 lines, nothing but what ships with macOS.
+- **One bash script.** About 100 lines, nothing but what ships with macOS.
 
 ## Install
 
@@ -37,11 +37,11 @@ herdr-lid-awake install-sudoers     # asks for your password, once
 brew services start herdr-lid-awake
 ```
 
-`install-sudoers` writes `/etc/sudoers.d/herdr-lid-awake`, which lets your user run exactly two commands without a password: `pmset disablesleep 0` and `pmset disablesleep 1`. It checks the rule with `visudo -c` before installing it, because a broken file in `sudoers.d` disables `sudo` altogether. To see the rule first:
+`install-sudoers` writes `/etc/sudoers.d/herdr-lid-awake`, which lets your user run exactly two commands without a password: `pmset disablesleep 0` and `pmset disablesleep 1`. It checks the rule with `visudo -c` before installing it, because a broken file in `sudoers.d` disables `sudo` altogether. To see the rule first (the name is whoever runs the command, so yours, not `you`):
 
 ```sh
 $ herdr-lid-awake sudoers
-milos ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1
+you ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1
 ```
 
 ## Use

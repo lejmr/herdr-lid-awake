@@ -4,7 +4,7 @@
 # sets `pmset disablesleep 1`, and clears it once Herdr lets go.
 # Needs a sudoers rule for pmset: run `herdr-lid-awake install-sudoers` once.
 
-VERSION=0.2.0
+VERSION=0.2.1
 
 # The env overrides exist for tests/run.sh; the defaults are production.
 PMSET=${HERDR_LID_AWAKE_PMSET:-/usr/bin/pmset}

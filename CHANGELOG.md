@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 - 2026-10-24
+
+- Installs from a Homebrew bottle. Without one, brew treated the formula as a build from source and refused to install with an outdated Xcode, although the script needs no compiler.
+
 ## 0.2.0 - 2026-10-24
 
 - Cup off with the lid closed puts the Mac to sleep (`pmset sleepnow`), so the cup "until agents finish" lets a closed Mac sleep when the last agent finishes. Not with an external display attached.

@@ -50,8 +50,8 @@ The permanent requirement set. A change is done when every row holds.
 1. Bump `VERSION=` in `herdr-lid-awake`, add a `## X.Y.Z - YYYY-MM-DD` section to `CHANGELOG.md`.
 2. `bash tests/run.sh`, commit, push, wait for CI.
 3. `git tag vX.Y.Z && git push origin vX.Y.Z`.
-4. `release.yml` fails unless the tag is `v$VERSION` and the changelog has the section. Then it creates the GitHub release with that section as notes, computes the sha256 of the tag tarball and commits the new `url` and `sha256` to `lejmr/homebrew-tap`. It needs the repository secret `TAP_TOKEN`, a token with write access to the tap.
-5. Wait for the tap CI (row 11), then run the manual batch below.
+4. `release.yml` fails unless the tag is `v$VERSION` and the changelog has the section. Then it creates the GitHub release with that section as notes. A macOS job bumps `url` and `sha256` in the tap formula, builds the bottle, uploads it to the release as `herdr-lid-awake-X.Y.Z.all.bottle.tar.gz` and commits url, sha256 and `bottle do` to `lejmr/homebrew-tap` in one commit. A failed run is redone with `gh workflow run release.yml -f tag=vX.Y.Z`. It needs the repository secret `TAP_TOKEN`, a token with write access to the tap.
+5. Wait for the tap CI (row 11): it fails unless `brew install` printed `Pouring herdr-lid-awake`. Then run the manual batch below.
 
 ## Manual batch (rows 13 to 15)
 

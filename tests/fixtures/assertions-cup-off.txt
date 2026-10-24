@@ -1,0 +1,28 @@
+2026-10-24 11:43:08 +0200 
+Assertion status system-wide:
+   BackgroundTask                 0
+   ApplePushServiceTask           0
+   UserIsActive                   1
+   PreventUserIdleDisplaySleep    0
+   SoftwareUpdateTask             0
+   PreventSystemSleep             0
+   PreventSystemSleepSecurityIndicator 0
+   ExternalMedia                  0
+   PreventUserIdleSystemSleep     1
+   NetworkClientActive            0
+Listed by owning process:
+   pid 35009(mdsync): [0x000e1f74000b97ce] 02:02:34 BackgroundTask named: "com.apple.metadata.mds.scan"  
+   pid 503(backupd): [0x000e1f08000197ab] 02:04:22 PreventUserIdleSystemSleep named: "Backup Job"  
+   pid 356(powerd): [0x000e3ba100019afc] 00:02:22 PreventUserIdleSystemSleep named: "Powerd - Prevent sleep while display is on"  
+   pid 412(WindowServer): [0x000e3ba100099afb] 00:00:00 UserIsActive named: "com.apple.iohideventsystem.queue.tickle serviceID:100000cd1 service:AppleMultitouchDevice product:Apple Internal Keyboard / Trackpad eventType:11"  
+	Timeout will fire in 119 secs Action=TimeoutActionRelease
+   pid 65980(cloudd): [0x000e3c2c000c9b61] 00:00:03 SystemIsActive named: "NSURLSessionTask 99192992-694A-4F0A-820F-8BE69151CFAF"  
+	Timeout will fire in 10797 secs Action=TimeoutActionTurnOff
+   pid 88108(caffeinate): [0x000e3c0300019b58] 00:00:44 PreventUserIdleSystemSleep named: "caffeinate command-line tool"  
+	Details: caffeinate asserting for 300 secs
+	Localized=THE CAFFEINATE TOOL IS PREVENTING SLEEP.
+	Timeout will fire in 256 secs Action=TimeoutActionRelease
+   pid 783(sharingd): [0x000e3c1200019b5b] 00:00:28 PreventUserIdleSystemSleep named: "Handoff"  
+   pid 33929(Claude): [0x000caf0e000184e5] 29:17:59 NoIdleSleepAssertion named: "Electron"  
+   pid 511(mds_stores): [0x000e3c2e000b9b62] 00:00:00 BackgroundTask named: "com.apple.metadata.mds_stores.power"  
+No kernel assertions.

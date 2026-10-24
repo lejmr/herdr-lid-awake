@@ -1,0 +1,14 @@
+name: ci
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'   # weekly, macOS and its pmset change under us
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install shellcheck
+      - run: bash tests/run.sh
+      - run: shellcheck herdr-lid-awake tests/*.sh

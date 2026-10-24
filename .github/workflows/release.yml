@@ -1,0 +1,41 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches VERSION and CHANGELOG
+        run: |
+          version=$(sed -n 's/^VERSION=//p' herdr-lid-awake)
+          [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "tag $GITHUB_REF_NAME != v$version in herdr-lid-awake"; exit 1; }
+          grep -q "^## $version " CHANGELOG.md || { echo "CHANGELOG.md has no '## $version' section"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          awk -v h="## $VERSION " 'index($0, h) == 1 { p = 1; next } /^## / { p = 0 } p' CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
+      - name: Checksum of the tag tarball
+        run: |
+          url="https://github.com/${{ github.repository }}/archive/refs/tags/$GITHUB_REF_NAME.tar.gz"
+          echo "URL=$url" >> "$GITHUB_ENV"
+          echo "SHA=$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          repository: lejmr/homebrew-tap
+          token: ${{ secrets.TAP_TOKEN }}
+          path: tap
+      - name: Bump the formula
+        working-directory: tap
+        run: |
+          sed -i -E "s|^(  url \").*(\")|\1$URL\2|; s|^(  sha256 \").*(\")|\1$SHA\2|" Formula/herdr-lid-awake.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "herdr-lid-awake $VERSION"
+          git push

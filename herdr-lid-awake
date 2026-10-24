@@ -1,0 +1,88 @@
+#!/bin/bash
+# Keep the Mac running with the lid closed while the Herdr cup is on.
+# Watches power assertions live; when Herdr holds PreventUserIdleSystemSleep,
+# sets `pmset disablesleep 1`, and clears it once Herdr lets go.
+# Needs a sudoers rule for pmset: run `herdr-lid-awake install-sudoers` once.
+
+VERSION=0.1.0
+
+# The env overrides exist for tests/run.sh; the defaults are production.
+PMSET=${HERDR_LID_AWAKE_PMSET:-/usr/bin/pmset}
+SUDO=${HERDR_LID_AWAKE_SUDO:-sudo}
+VISUDO=${HERDR_LID_AWAKE_VISUDO:-/usr/sbin/visudo}
+STATE=${HERDR_LID_AWAKE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/herdr-lid-awake}
+SUDOERS=/etc/sudoers.d/herdr-lid-awake
+# Exists exactly while this tool has sleep disabled, so a kill -9 or a power
+# loss is recognised on the next start.
+MARKER=$STATE/holding
+
+case $1 in
+  --version)
+    echo "herdr-lid-awake $VERSION"
+    exit ;;
+  sudoers)
+    echo "$(id -un) ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1"
+    exit ;;
+  install-sudoers)
+    # A broken file in sudoers.d disables sudo entirely, so validate before installing.
+    tmp=$(mktemp) && "$0" sudoers > "$tmp" && "$VISUDO" -cqf "$tmp" &&
+      "$SUDO" install -m 0440 -o root -g wheel "$tmp" "$SUDOERS" && echo "installed $SUDOERS"
+    rc=$?; rm -f "$tmp"; exit $rc ;;
+  "") ;;
+  *)
+    echo "usage: herdr-lid-awake [--version | sudoers | install-sudoers]" >&2
+    exit 2 ;;
+esac
+
+owned=0
+warned=0
+
+cup_on() { "$PMSET" -g assertions | grep -q '(Herdr).*PreventUserIdleSystemSleep'; }
+sleep_disabled() { "$PMSET" -g | grep -q 'SleepDisabled[[:space:]]*1'; }
+log() { echo "$(date '+%F %T') lid: $1"; }
+
+# Say it once, not once per event.
+warn() {
+  [ $warned = 1 ] && return
+  warned=1
+  echo "sudoers rule missing: run herdr-lid-awake install-sudoers" >&2
+}
+
+run_sudo() { "$SUDO" -n "$PMSET" "$@" 2>/dev/null || { warn; return 1; }; }
+
+apply() {
+  if cup_on; then
+    # Leave a SleepDisabled 1 someone else set alone; only clear what we set.
+    if [ $owned = 0 ] && ! sleep_disabled; then
+      mkdir -p "$STATE" && : > "$MARKER"
+      if run_sudo disablesleep 1; then owned=1; log awake; else rm -f "$MARKER"; fi
+    fi
+  elif [ $owned = 1 ]; then
+    run_sudo disablesleep 0 && owned=0 && rm -f "$MARKER" && log sleeps
+  fi
+}
+
+release() {
+  trap - EXIT INT TERM HUP
+  [ $owned = 1 ] && run_sudo disablesleep 0 && rm -f "$MARKER"
+  # ponytail: kills every child of this shell; fine while `script` is the only one.
+  pkill -P $$ 2>/dev/null
+  exit 0
+}
+trap release EXIT INT TERM HUP
+
+"$SUDO" -n -l /usr/bin/pmset disablesleep 1 >/dev/null 2>&1 || warn
+
+# A marker means a previous run died holding SleepDisabled 1: take it over.
+# Cup still on, we keep holding; cup gone, apply lets go.
+[ -e "$MARKER" ] && owned=1
+
+apply
+# `script` gives pmset a pty, otherwise it block-buffers and lines arrive late.
+# Any Herdr line (Created, Released, ClientDied) triggers a re-check, and so
+# does the first line, which closes the gap between the check above and the stream.
+first=1
+while IFS= read -r line; do
+  if [ $first = 1 ]; then first=0; apply; fi
+  case $line in *Herdr*) apply ;; esac
+done < <(exec script -q /dev/null "$PMSET" -g assertionslog </dev/null)

@@ -33,7 +33,18 @@ case "$*" in
     echo "Showing all currently held IOKit power assertions"
     exec cat "$FAKE_DIR/log" ;;
   "disablesleep "*) echo "$2" > "$FAKE_DIR/sleepdisabled"; echo "disablesleep $2" >> "$FAKE_DIR/calls" ;;
+  sleepnow) echo sleepnow >> "$FAKE_DIR/calls" ;;
 esac
+FAKE
+  # The two lines of `ioreg -r -k AppleClamshellState -d 1` the script reads, as on a real Mac.
+  # open: no external display, closing would sleep; closed-display: an external display is attached.
+  echo open > "$T/lid"
+  cat > "$T/ioreg" <<'FAKE'
+#!/bin/bash
+case $(cat "$FAKE_DIR/lid") in
+  open) s=No c=Yes ;; closed) s=Yes c=Yes ;; closed-display) s=Yes c=No ;;
+esac
+printf '      "AppleClamshellCausesSleep" = %s\n      "AppleClamshellState" = %s\n' "$c" "$s"
 FAKE
   cat > "$T/sudo" <<'FAKE'
 #!/bin/bash
@@ -48,11 +59,11 @@ fi
 exec "$@"
 FAKE
   printf '#!/bin/bash\nexit 0\n' > "$T/visudo"
-  chmod +x "$T/pmset" "$T/sudo" "$T/visudo"
+  chmod +x "$T/pmset" "$T/sudo" "$T/visudo" "$T/ioreg"
   mkfifo "$T/log"
   exec 9<> "$T/log"   # hold the FIFO open so the fake log never sees EOF
   export HERDR_LID_AWAKE_PMSET=$T/pmset HERDR_LID_AWAKE_SUDO=$T/sudo
-  export HERDR_LID_AWAKE_VISUDO=$T/visudo HERDR_LID_AWAKE_STATE_DIR=$T/state
+  export HERDR_LID_AWAKE_VISUDO=$T/visudo HERDR_LID_AWAKE_STATE_DIR=$T/state HERDR_LID_AWAKE_IOREG=$T/ioreg
 }
 
 teardown() {
@@ -241,10 +252,28 @@ test_x10() {
   [ "$(sd)" = 0 ] || { echo "HerdrHelper counted as the cup" >&2; return 1; }
 }
 
+test_16() {
+  # Cup "until agents finish": the lid was closed while holding, the last agent finishes.
+  start && emit on "$CREATED" && within_1s 1 && echo closed > "$T/lid" && emit off "$RELEASED" && within_1s 0 || return 1
+  for _ in $(seq 20); do [ "$(calls)" = "$(printf 'disablesleep 1\ndisablesleep 0\nsleepnow')" ] && return; sleep 0.05; done
+  echo "calls: $(calls)" >&2; return 1
+}
+
+test_x11() {
+  # Lid open, or closed with an external display: cup off must not put the Mac to sleep.
+  for lid in open closed-display; do
+    echo "$lid" > "$T/lid"; rm -f "$T/calls"
+    emit on "$CREATED"; [ -n "$W" ] || start || return 1
+    within_1s 1 && emit off "$RELEASED" && within_1s 0 || return 1
+    sleep 2.5   # past the CausesSleep poll
+    [ "$(calls)" = "$(printf 'disablesleep 1\ndisablesleep 0')" ] || { echo "$lid: calls: $(calls)" >&2; return 1; }
+  done
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 16 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -261,6 +290,7 @@ exit $fail
 # row 9: sudoers prints a valid rule
 # row 10: install-sudoers never installs an invalid rule
 # row 12: script is lint-clean
+# row 16: cup off with the lid closed puts the Mac to sleep
 # row x1: install-sudoers does not re-run itself through PATH
 # row x2: stale marker with sleep enabled is dropped, cup on disables sleep
 # row x3: unwritable state dir means no disablesleep, with a message
@@ -271,3 +301,4 @@ exit $fail
 # row x8: --help prints usage, exit 0
 # row x9: cup on between startup check and first stream line is seen
 # row x10: PreventSystemSleep counts, HerdrHelper does not
+# row x11: cup off with the lid open or an external display does not sleep

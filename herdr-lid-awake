@@ -10,6 +10,7 @@ VERSION=0.1.0
 PMSET=${HERDR_LID_AWAKE_PMSET:-/usr/bin/pmset}
 SUDO=${HERDR_LID_AWAKE_SUDO:-sudo}
 VISUDO=${HERDR_LID_AWAKE_VISUDO:-/usr/sbin/visudo}
+IOREG=${HERDR_LID_AWAKE_IOREG:-/usr/sbin/ioreg}
 STATE=${HERDR_LID_AWAKE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/herdr-lid-awake}
 # Exists exactly while this tool has sleep disabled, so a kill -9 or a power
 # loss is recognised on the next start.
@@ -65,6 +66,23 @@ cup_on() { "$PMSET" -g assertions | grep -Eq '\(Herdr\).*Prevent(UserIdle)?Syste
 sleep_disabled() { "$PMSET" -g | grep -q 'SleepDisabled[[:space:]]*1'; }
 log() { echo "$(date '+%F %T') lid: $1"; }
 
+# macOS sleeps on the lid-close event. If the lid closed while sleep was disabled, that
+# event is gone and the Mac would stay awake until the lid is opened and closed again
+# (the cup "until agents finish" turns off exactly then). So sleep now, unless the lid is
+# open or CausesSleep says No: an external display keeps a closed Mac in use.
+# Polled briefly in case CausesSleep follows disablesleep 0 with a delay (unverified).
+sleep_if_lid_closed() {
+  local s
+  for _ in 1 2 3 4; do
+    s=$("$IOREG" -r -k AppleClamshellState -d 1)
+    [[ $s == *'"AppleClamshellState" = Yes'* ]] || return 0
+    if [[ $s == *'"AppleClamshellCausesSleep" = Yes'* ]]; then
+      log "lid closed, sleeping now"; "$PMSET" sleepnow >/dev/null; return 0
+    fi
+    sleep 0.5
+  done
+}
+
 # Say it once, not once per event.
 warn() {
   [ $warned = 1 ] && return
@@ -86,7 +104,7 @@ apply() {
       fi
     fi
   elif [ $owned = 1 ]; then
-    run_sudo disablesleep 0 && owned=0 && rm -f "$MARKER" && log sleeps
+    run_sudo disablesleep 0 && owned=0 && rm -f "$MARKER" && log sleeps && sleep_if_lid_closed
   fi
 }
 

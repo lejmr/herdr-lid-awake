@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Cup off with the lid closed puts the Mac to sleep (`pmset sleepnow`), so the cup "until agents finish" lets a closed Mac sleep when the last agent finishes. Not with an external display attached.
+
 ## 0.1.0 - 2026-10-24
 
 First release.

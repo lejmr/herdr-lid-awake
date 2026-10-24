@@ -158,10 +158,18 @@ DECOY
   [ "$(calls)" = "sudo install" ] || { echo "calls: $(calls)" >&2; return 1; }
 }
 
+test_x2() {
+  # Marker left over, but sleep is enabled (reboot, someone cleared it): the marker is stale,
+  # cup on must disable sleep again.
+  mkdir -p "$T/state"; : > "$T/state/holding"; echo on > "$T/cup"
+  start; within_1s 1 || return 1
+  emit off "$RELEASED"; within_1s 0
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12 x1; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -179,3 +187,4 @@ exit $fail
 # row 10: install-sudoers never installs an invalid rule
 # row 12: script is lint-clean
 # row x1: install-sudoers does not re-run itself through PATH
+# row x2: stale marker with sleep enabled is dropped, cup on disables sleep

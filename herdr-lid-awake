@@ -79,7 +79,10 @@ trap release EXIT INT TERM HUP
 
 # A marker means a previous run died holding SleepDisabled 1: take it over.
 # Cup still on, we keep holding; cup gone, apply lets go.
-[ -e "$MARKER" ] && owned=1
+# If sleep is not disabled any more (reboot, someone cleared it), the marker is stale.
+if [ -e "$MARKER" ]; then
+  if sleep_disabled; then owned=1; else rm -f "$MARKER"; fi
+fi
 
 apply
 # `script` gives pmset a pty, otherwise it block-buffers and lines arrive late.

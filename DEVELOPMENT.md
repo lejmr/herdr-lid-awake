@@ -18,6 +18,8 @@ Needs macOS (the real `script`, `visudo`, `pgrep`) and `shellcheck`. `pmset`, `s
 
 `tests/fixtures/` holds output captured on a real Mac (macOS 27.0.1, Herdr UI 20261020.1). The capture has no Herdr `ClientDied` line, so `tests/run.sh` derives one from the caffeinate `ClientDied` line by substituting the Herdr pid, assertion id and name.
 
+Rows `x1` to `x8` in `tests/run.sh` are regression tests for defects found after the table was written (PATH lookup of `$0`, stale marker, unwritable state dir, rule for root, per-uid sudoers file, ineffective sudoers file, second watcher, `--help`).
+
 ## Acceptance table
 
 The permanent requirement set. A change is done when every row holds.

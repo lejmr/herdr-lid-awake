@@ -11,21 +11,24 @@ PMSET=${HERDR_LID_AWAKE_PMSET:-/usr/bin/pmset}
 SUDO=${HERDR_LID_AWAKE_SUDO:-sudo}
 VISUDO=${HERDR_LID_AWAKE_VISUDO:-/usr/sbin/visudo}
 STATE=${HERDR_LID_AWAKE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/herdr-lid-awake}
-SUDOERS=/etc/sudoers.d/herdr-lid-awake
 # Exists exactly while this tool has sleep disabled, so a kill -9 or a power
 # loss is recognised on the next start.
 MARKER=$STATE/holding
 
+# Under `sudo herdr-lid-awake ...` id says root; the rule is for the user who ran sudo.
+# Sets $user and $uid. The file is named by uid: sudo skips files in sudoers.d whose
+# name contains a '.', and user names may (jana.novak). One file per user, so a
+# second account does not overwrite the first one's rule.
+who() {
+  user=$(id -un) uid=$(id -u)
+  [ "$uid" = 0 ] && { user=${SUDO_USER:-}; uid=${SUDO_UID:-}; }
+  case $user:$uid in
+    :*|*:|root:*|*:0) echo "run as your own user, not root (a rule for root is useless)" >&2; return 1 ;;
+  esac
+}
 # A function, not `"$0" sudoers`: run as `bash herdr-lid-awake`, $0 has no slash and
 # would resolve through PATH to some other install.
-# Under `sudo herdr-lid-awake ...` id says root; the rule is for the user who ran sudo.
-rule() {
-  local u; u=$(id -un); [ "$u" = root ] && u=${SUDO_USER:-}
-  case $u in
-    ""|root) echo "run as your own user, not root (a rule for root is useless)" >&2; return 1 ;;
-  esac
-  echo "$u ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1"
-}
+rule() { who && echo "$user ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1"; }
 
 case $1 in
   --version)
@@ -37,8 +40,14 @@ case $1 in
   install-sudoers)
     # A broken file in sudoers.d disables sudo entirely, so validate before installing.
     tmp=$(mktemp) && rule > "$tmp" && "$VISUDO" -cqf "$tmp" &&
-      "$SUDO" install -m 0440 -o root -g wheel "$tmp" "$SUDOERS" && echo "installed $SUDOERS"
-    rc=$?; rm -f "$tmp"; exit $rc ;;
+      "$SUDO" install -m 0440 -o root -g wheel "$tmp" "/etc/sudoers.d/herdr-lid-awake-$uid" &&
+      echo "installed /etc/sudoers.d/herdr-lid-awake-$uid"
+    rc=$?
+    # An installed file is not an effective one: /etc/sudoers may lack #includedir.
+    if [ $rc = 0 ] && ! "$SUDO" -n -l /usr/bin/pmset disablesleep 1 >/dev/null 2>&1; then
+      echo "but sudo does not use it: does /etc/sudoers have '#includedir /etc/sudoers.d'?" >&2; rc=1
+    fi
+    rm -f "$tmp"; exit $rc ;;
   "") ;;
   *)
     echo "usage: herdr-lid-awake [--version | sudoers | install-sudoers]" >&2

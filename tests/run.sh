@@ -43,7 +43,7 @@ if [ "$1" = -n ]; then
   exec "$@"
 fi
 # Never really install anything.
-[ "$1" = install ] && { echo "sudo install" >> "$FAKE_DIR/calls"; exit 0; }
+[ "$1" = install ] && { echo "sudo install" >> "$FAKE_DIR/calls"; echo "$*" > "$FAKE_DIR/install_args"; exit 0; }
 exec "$@"
 FAKE
   printf '#!/bin/bash\nexit 0\n' > "$T/visudo"
@@ -179,10 +179,10 @@ test_x4() {
   mkdir "$T/fakeid"
   cat > "$T/fakeid/id" <<'ID'
 #!/bin/bash
-echo root
+[ "$1" = -u ] && echo 0 || echo root
 ID
   chmod +x "$T/fakeid/id"
-  out=$(PATH=$T/fakeid:$PATH SUDO_USER=jana "$BIN" sudoers)
+  out=$(PATH=$T/fakeid:$PATH SUDO_USER=jana SUDO_UID=501 "$BIN" sudoers)
   [ "$out" = "jana ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1" ] ||
     { echo "rule: $out" >&2; return 1; }
   for u in "" root; do
@@ -191,10 +191,26 @@ ID
   [ -z "$(calls)" ] || { echo "install called: $(calls)" >&2; return 1; }
 }
 
+test_x5() {
+  # One file per user, named by uid (no '.' in it, one account must not overwrite another's rule).
+  "$BIN" install-sudoers >/dev/null || return 1
+  case $(cat "$T/install_args") in
+    *" /etc/sudoers.d/herdr-lid-awake-$(id -u)") ;;
+    *) echo "args: $(cat "$T/install_args")" >&2; return 1 ;;
+  esac
+}
+
+test_x6() {
+  # sudo does not honour the installed file (no #includedir): say so, exit non-zero.
+  touch "$T/sudo_fail"
+  "$BIN" install-sudoers >/dev/null 2>"$T/err" && { echo "exit 0 although sudo -l fails" >&2; return 1; }
+  grep -q includedir "$T/err" || { echo "no hint: $(cat "$T/err")" >&2; return 1; }
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3 x4; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3 x4 x5 x6; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -215,3 +231,5 @@ exit $fail
 # row x2: stale marker with sleep enabled is dropped, cup on disables sleep
 # row x3: unwritable state dir means no disablesleep, with a message
 # row x4: under sudo the rule names SUDO_USER, never root
+# row x5: sudoers file is per uid
+# row x6: install-sudoers fails when sudo does not use the file

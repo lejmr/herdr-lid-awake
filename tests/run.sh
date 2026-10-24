@@ -174,10 +174,27 @@ test_x3() {
   [ -s "$T/out" ] || { echo "no message" >&2; return 1; }
 }
 
+test_x4() {
+  # Under `sudo`, id -un says root; the rule must name SUDO_USER, and refuse without one.
+  mkdir "$T/fakeid"
+  cat > "$T/fakeid/id" <<'ID'
+#!/bin/bash
+echo root
+ID
+  chmod +x "$T/fakeid/id"
+  out=$(PATH=$T/fakeid:$PATH SUDO_USER=jana "$BIN" sudoers)
+  [ "$out" = "jana ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1" ] ||
+    { echo "rule: $out" >&2; return 1; }
+  for u in "" root; do
+    PATH=$T/fakeid:$PATH SUDO_USER=$u "$BIN" install-sudoers >/dev/null 2>&1 && { echo "exit 0 as root, SUDO_USER='$u'" >&2; return 1; }
+  done
+  [ -z "$(calls)" ] || { echo "install called: $(calls)" >&2; return 1; }
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 x1 x2 x3 x4; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -197,3 +214,4 @@ exit $fail
 # row x1: install-sudoers does not re-run itself through PATH
 # row x2: stale marker with sleep enabled is dropped, cup on disables sleep
 # row x3: unwritable state dir means no disablesleep, with a message
+# row x4: under sudo the rule names SUDO_USER, never root

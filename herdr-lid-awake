@@ -18,7 +18,14 @@ MARKER=$STATE/holding
 
 # A function, not `"$0" sudoers`: run as `bash herdr-lid-awake`, $0 has no slash and
 # would resolve through PATH to some other install.
-rule() { echo "$(id -un) ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1"; }
+# Under `sudo herdr-lid-awake ...` id says root; the rule is for the user who ran sudo.
+rule() {
+  local u; u=$(id -un); [ "$u" = root ] && u=${SUDO_USER:-}
+  case $u in
+    ""|root) echo "run as your own user, not root (a rule for root is useless)" >&2; return 1 ;;
+  esac
+  echo "$u ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1"
+}
 
 case $1 in
   --version)

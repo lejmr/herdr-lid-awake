@@ -4,7 +4,7 @@
 # sets `pmset disablesleep 1`, and clears it once Herdr lets go.
 # Needs a sudoers rule for pmset: run `herdr-lid-awake install-sudoers` once.
 
-VERSION=0.1.0
+VERSION=0.2.0
 
 # The env overrides exist for tests/run.sh; the defaults are production.
 PMSET=${HERDR_LID_AWAKE_PMSET:-/usr/bin/pmset}
@@ -31,6 +31,18 @@ who() {
 # would resolve through PATH to some other install.
 rule() { who && echo "$user ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1"; }
 
+sleep_disabled() { "$PMSET" -g | grep -q 'SleepDisabled[[:space:]]*1'; }
+# Does the rule really work? Run it, writing back the current value, which changes nothing.
+# Not `sudo -l`: for an admin `(ALL) ALL` lists every command, password or not.
+# -k: the password just typed for `sudo install` is cached and would pass without the rule.
+# ponytail: a watcher flipping SleepDisabled between the read and the write is undone; only
+# install-sudoers with a running watcher and a cup change in that instant could hit it.
+rule_works() {
+  local v=0
+  sleep_disabled && v=1
+  "$SUDO" -k -n "$PMSET" disablesleep $v >/dev/null 2>&1
+}
+
 case $1 in
   --version)
     echo "herdr-lid-awake $VERSION"
@@ -45,7 +57,7 @@ case $1 in
       echo "installed /etc/sudoers.d/herdr-lid-awake-$uid"
     rc=$?
     # An installed file is not an effective one: /etc/sudoers may lack #includedir.
-    if [ $rc = 0 ] && ! "$SUDO" -n -l /usr/bin/pmset disablesleep 1 >/dev/null 2>&1; then
+    if [ $rc = 0 ] && ! rule_works; then
       echo "but sudo does not use it: does /etc/sudoers have '#includedir /etc/sudoers.d'?" >&2; rc=1
     fi
     rm -f "$tmp"; exit $rc ;;
@@ -63,7 +75,6 @@ warned=0
 
 # keep_awake_scope "system" may hold PreventSystemSleep instead (unverified); (Herdr) stays exact.
 cup_on() { "$PMSET" -g assertions | grep -Eq '\(Herdr\).*Prevent(UserIdle)?SystemSleep'; }
-sleep_disabled() { "$PMSET" -g | grep -q 'SleepDisabled[[:space:]]*1'; }
 log() { echo "$(date '+%F %T') lid: $1"; }
 
 # macOS sleeps on the lid-close event. If the lid closed while sleep was disabled, that
@@ -127,7 +138,7 @@ mkdir -p "$STATE" 2>/dev/null && echo $$ > "$PIDFILE"
 
 trap release EXIT INT TERM HUP
 
-"$SUDO" -n -l /usr/bin/pmset disablesleep 1 >/dev/null 2>&1 || warn
+rule_works || warn
 
 # A marker means a previous run died holding SleepDisabled 1: take it over.
 # Cup still on, we keep holding; cup gone, apply lets go.

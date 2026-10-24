@@ -46,16 +46,19 @@ case $(cat "$FAKE_DIR/lid") in
 esac
 printf '      "AppleClamshellCausesSleep" = %s\n      "AppleClamshellState" = %s\n' "$c" "$s"
 FAKE
+  # Like sudo for an admin on a real Mac: `(ALL) ALL` makes `-l` succeed for any command, and
+  # a password typed for `sudo install` stays cached; only -k ignores it. sudo_fail = no NOPASSWD rule.
   cat > "$T/sudo" <<'FAKE'
 #!/bin/bash
+k=0; [ "$1" = -k ] && { k=1; shift; }
 if [ "$1" = -n ]; then
   shift
-  [ -e "$FAKE_DIR/sudo_fail" ] && exit 1
   [ "$1" = -l ] && exit 0
+  if [ -e "$FAKE_DIR/sudo_fail" ]; then [ $k = 0 ] && [ -e "$FAKE_DIR/cached" ] || exit 1; fi
   exec "$@"
 fi
 # Never really install anything.
-[ "$1" = install ] && { echo "sudo install" >> "$FAKE_DIR/calls"; echo "$*" > "$FAKE_DIR/install_args"; exit 0; }
+[ "$1" = install ] && { echo "sudo install" >> "$FAKE_DIR/calls"; echo "$*" > "$FAKE_DIR/install_args"; touch "$FAKE_DIR/cached"; exit 0; }
 exec "$@"
 FAKE
   printf '#!/bin/bash\nexit 0\n' > "$T/visudo"
@@ -78,7 +81,8 @@ start() {
   rm -f "$T/logpid"
   "$BIN" >> "$T/out" 2>&1 9>&- &
   W=$!
-  for _ in $(seq 100); do [ -e "$T/logpid" ] && return; sleep 0.05; done
+  # The startup probe rewrites the current SleepDisabled; count calls from the live stream on.
+  for _ in $(seq 100); do [ -e "$T/logpid" ] && { rm -f "$T/calls"; return; }; sleep 0.05; done
   echo "watcher did not start" >&2; return 1
 }
 
@@ -152,7 +156,7 @@ test_9() {
 test_10() {
   # Control: a valid rule does reach `sudo install`.
   "$BIN" install-sudoers >/dev/null || return 1
-  [ "$(calls)" = "sudo install" ] || { echo "control: install not called" >&2; return 1; }
+  [ "$(calls)" = "$(printf 'sudo install\ndisablesleep 0')" ] || { echo "control: calls $(calls)" >&2; return 1; }
   rm -f "$T/calls"
   printf '#!/bin/bash\nexit 1\n' > "$T/visudo"
   "$BIN" install-sudoers >/dev/null 2>&1 && { echo "exit 0 on invalid rule" >&2; return 1; }
@@ -168,7 +172,7 @@ echo decoy >> "$FAKE_DIR/calls"
 DECOY
   chmod +x "$T/decoy/herdr-lid-awake"
   (cd "$ROOT" && PATH=$T/decoy:$PATH bash herdr-lid-awake install-sudoers) >/dev/null 2>&1
-  [ "$(calls)" = "sudo install" ] || { echo "calls: $(calls)" >&2; return 1; }
+  [ "$(calls)" = "$(printf 'sudo install\ndisablesleep 0')" ] || { echo "calls: $(calls)" >&2; return 1; }
 }
 
 test_x2() {
@@ -214,9 +218,10 @@ test_x5() {
 }
 
 test_x6() {
-  # sudo does not honour the installed file (no #includedir): say so, exit non-zero.
+  # sudo does not honour the installed file (no #includedir): say so, exit non-zero. `sudo -l` still
+  # succeeds for an admin and the password from `sudo install` is cached, so neither may count.
   touch "$T/sudo_fail"
-  "$BIN" install-sudoers >/dev/null 2>"$T/err" && { echo "exit 0 although sudo -l fails" >&2; return 1; }
+  "$BIN" install-sudoers >/dev/null 2>"$T/err" && { echo "exit 0 although the rule does not work" >&2; return 1; }
   grep -q includedir "$T/err" || { echo "no hint: $(cat "$T/err")" >&2; return 1; }
 }
 
@@ -261,19 +266,28 @@ test_16() {
 
 test_x11() {
   # Lid open, or closed with an external display: cup off must not put the Mac to sleep.
+  start || return 1
   for lid in open closed-display; do
     echo "$lid" > "$T/lid"; rm -f "$T/calls"
-    emit on "$CREATED"; [ -n "$W" ] || start || return 1
-    within_1s 1 && emit off "$RELEASED" && within_1s 0 || return 1
+    emit on "$CREATED" && within_1s 1 && emit off "$RELEASED" && within_1s 0 || return 1
     sleep 2.5   # past the CausesSleep poll
     [ "$(calls)" = "$(printf 'disablesleep 1\ndisablesleep 0')" ] || { echo "$lid: calls: $(calls)" >&2; return 1; }
   done
 }
 
+test_x12() {
+  # No NOPASSWD rule on an admin account: warn at start, before any cup change, and only once.
+  touch "$T/sudo_fail"
+  start; sleep 0.3
+  [ "$(cat "$T/out")" = "sudoers rule missing: run herdr-lid-awake install-sudoers" ] || { echo "out: $(cat "$T/out")" >&2; return 1; }
+  emit on "$CREATED"; sleep 0.3
+  [ "$(cat "$T/out")" = "sudoers rule missing: run herdr-lid-awake install-sudoers" ] || { echo "out: $(cat "$T/out")" >&2; return 1; }
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12 16 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 16 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -302,3 +316,4 @@ exit $fail
 # row x9: cup on between startup check and first stream line is seen
 # row x10: PreventSystemSleep counts, HerdrHelper does not
 # row x11: cup off with the lid open or an external display does not sleep
+# row x12: missing rule on an admin account is reported at start

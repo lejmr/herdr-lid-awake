@@ -34,7 +34,7 @@ The permanent requirement set. A change is done when every row holds.
 | 5 | Two Herdr instances: one off does not release | cup state stays on while one `Released` line arrives, then off | `1`, then `0` after the last | `tests/run.sh` |
 | 6 | Stopping the watcher restores sleep | `kill -TERM` while holding | `0`, no leftover child processes | `tests/run.sh` |
 | 7 | After kill -9 or power loss, next start restores | `kill -9` while holding (marker remains), restart with cup off | `0`, marker removed; restart with cup on adopts (stays `1`, later off gives `0`) | `tests/run.sh` |
-| 8 | Missing sudoers gives a clear message | `sudo -n -l` fails at start | exactly one line `sudoers rule missing: run herdr-lid-awake install-sudoers`, watcher keeps running, no spam per event | `tests/run.sh` |
+| 8 | Missing sudoers gives a clear message | no NOPASSWD rule (fake sudo as for an admin: `-l` succeeds, a cached password is ignored with `-k`), at start | exactly one line `sudoers rule missing: run herdr-lid-awake install-sudoers`, watcher keeps running, no spam per event | `tests/run.sh` |
 | 9 | `sudoers` prints a valid rule | `herdr-lid-awake sudoers > f && /usr/sbin/visudo -cf f` | `parsed OK`; rule is `<user> ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1` | `tests/run.sh` |
 | 10 | NEG: `install-sudoers` never installs an invalid rule | fake visudo fails | `sudo install` never called, exit not 0 | `tests/run.sh` |
 | 11 | Tap install on a fresh macOS | `brew install`, `brew test`, `brew audit --strict --online` | all pass | tap CI (`homebrew-tap/.github/workflows/ci.yml`) |

@@ -37,7 +37,7 @@ herdr-lid-awake install-sudoers     # asks for your password, once
 brew services start herdr-lid-awake
 ```
 
-`install-sudoers` writes `/etc/sudoers.d/herdr-lid-awake-<uid>` (your numeric user id: one file per account, and sudo skips file names with a dot, which user names like `jana.novak` have), which lets your user run exactly two commands without a password: `pmset disablesleep 0` and `pmset disablesleep 1`. It checks the rule with `visudo -c` before installing it, because a broken file in `sudoers.d` disables `sudo` altogether, and afterwards that `sudo` really accepts it. Run it as yourself; under `sudo` it uses `SUDO_USER`. To see the rule first (the name is whoever runs the command, so yours, not `you`):
+`install-sudoers` writes `/etc/sudoers.d/herdr-lid-awake-<uid>` (your numeric user id: one file per account, and sudo skips file names with a dot, which user names like `jana.novak` have), which lets your user run exactly two commands without a password: `pmset disablesleep 0` and `pmset disablesleep 1`. It checks the rule with `visudo -c` before installing it, because a broken file in `sudoers.d` disables `sudo` altogether, and afterwards that `sudo` really accepts it: it runs `sudo -k -n pmset disablesleep` with the current value, which changes nothing. `sudo -l` cannot tell: for an admin it lists every command, password or not. Run it as yourself; under `sudo` it uses `SUDO_USER`. To see the rule first (the name is whoever runs the command, so yours, not `you`):
 
 ```sh
 $ herdr-lid-awake sudoers

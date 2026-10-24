@@ -16,16 +16,20 @@ SUDOERS=/etc/sudoers.d/herdr-lid-awake
 # loss is recognised on the next start.
 MARKER=$STATE/holding
 
+# A function, not `"$0" sudoers`: run as `bash herdr-lid-awake`, $0 has no slash and
+# would resolve through PATH to some other install.
+rule() { echo "$(id -un) ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1"; }
+
 case $1 in
   --version)
     echo "herdr-lid-awake $VERSION"
     exit ;;
   sudoers)
-    echo "$(id -un) ALL=(root) NOPASSWD: /usr/bin/pmset disablesleep 0, /usr/bin/pmset disablesleep 1"
+    rule
     exit ;;
   install-sudoers)
     # A broken file in sudoers.d disables sudo entirely, so validate before installing.
-    tmp=$(mktemp) && "$0" sudoers > "$tmp" && "$VISUDO" -cqf "$tmp" &&
+    tmp=$(mktemp) && rule > "$tmp" && "$VISUDO" -cqf "$tmp" &&
       "$SUDO" install -m 0440 -o root -g wheel "$tmp" "$SUDOERS" && echo "installed $SUDOERS"
     rc=$?; rm -f "$tmp"; exit $rc ;;
   "") ;;

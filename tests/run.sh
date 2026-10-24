@@ -146,10 +146,22 @@ test_10() {
   [ -z "$(calls)" ] || { echo "install called: $(calls)" >&2; return 1; }
 }
 
+test_x1() {
+  # Run as `bash herdr-lid-awake`, $0 has no slash; a same-named decoy earlier on PATH must not run.
+  mkdir "$T/decoy"
+  cat > "$T/decoy/herdr-lid-awake" <<'DECOY'
+#!/bin/bash
+echo decoy >> "$FAKE_DIR/calls"
+DECOY
+  chmod +x "$T/decoy/herdr-lid-awake"
+  (cd "$ROOT" && PATH=$T/decoy:$PATH bash herdr-lid-awake install-sudoers) >/dev/null 2>&1
+  [ "$(calls)" = "sudo install" ] || { echo "calls: $(calls)" >&2; return 1; }
+}
+
 test_12() { (cd "$ROOT" && shellcheck herdr-lid-awake tests/*.sh); }
 
 fail=0
-for n in 1 2 3 4 5 6 7 8 9 10 12; do
+for n in 1 2 3 4 5 6 7 8 9 10 12 x1; do
   desc=$(sed -n "s/^# row $n: //p" "$ROOT/tests/run.sh" | head -1)
   if (setup; W=; trap teardown EXIT; "test_$n") >&2; then echo "ok $n - $desc"; else echo "not ok $n - $desc"; fail=1; fi
 done
@@ -166,3 +178,4 @@ exit $fail
 # row 9: sudoers prints a valid rule
 # row 10: install-sudoers never installs an invalid rule
 # row 12: script is lint-clean
+# row x1: install-sudoers does not re-run itself through PATH

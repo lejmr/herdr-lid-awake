@@ -27,7 +27,7 @@ The cup holds a power assertion, the same one `caffeinate` holds. macOS ignores 
 - **Within a second.** It follows the assertion log, nothing is polled.
 - **Leaves others alone.** It only clears a `SleepDisabled 1` it set itself. If Amphetamine or you disabled sleep first, it does not touch it.
 - **Gives sleep back.** Cup off, Herdr quit or crashed, watcher stopped or killed: sleep is restored.
-- **One bash script.** About 100 lines, nothing but what ships with macOS.
+- **One bash script.** About 130 lines, nothing but what ships with macOS.
 
 ## Install
 
@@ -54,7 +54,7 @@ If the sudoers rule is missing, the log says `sudoers rule missing: run herdr-li
 
 ## How it works
 
-`pmset -g assertionslog` prints every power assertion as it is created and released. The watcher reads it, and on any line from Herdr it asks `pmset -g assertions` whether Herdr still holds `PreventUserIdleSystemSleep`. If it does, `sudo -n pmset disablesleep 1`. If it stopped, `sudo -n pmset disablesleep 0`. A quit or a crash releases the assertion too, so it takes the same path.
+`pmset -g assertionslog` prints every power assertion as it is created and released. The watcher reads it, and on any line from Herdr it asks `pmset -g assertions` whether Herdr still holds `PreventUserIdleSystemSleep` (or `PreventSystemSleep`). If it does, `sudo -n pmset disablesleep 1`. If it stopped, `sudo -n pmset disablesleep 0`. A quit or a crash releases the assertion too, so it takes the same path.
 
 `pmset` buffers its output when it is not writing to a terminal, and the lines would arrive late. The watcher runs it under `script`, which gives it one.
 
@@ -66,7 +66,7 @@ While it holds `disablesleep 1`, the watcher keeps a marker file in `~/.local/st
 - `kill -9` of the watcher leaves `SleepDisabled 1` until the watcher starts again, which `brew services` does by itself. By hand: `sudo pmset disablesleep 0`.
 - A timed cup (`Herdr caffeine on --for 2h`) restores sleep when it ends: the assertion is released, which is a `Released` line like any other.
 - If another tool (Amphetamine, say) set `SleepDisabled 1` first, the watcher does not take over. If that tool clears it while the cup is on, the lid sleeps again until the next cup change.
-- Turning the cup off with the lid already closed does not put the Mac to sleep until the lid is opened and closed again. That is what the author of [herdr-gpui PR 337](https://github.com/penso/herdr-gpui/pull/337) saw in his own test; I have not tested it.
+- Turning the cup off with the lid already closed does not put the Mac to sleep until the lid is opened and closed again. That is what the author of [herdr-gpui PR 337](https://github.com/penso/herdr-gpui/pull/337) saw in their own test; I have not tested it.
 - No cutoff on low battery. Mind the charge.
 - Any Herdr UI process holding the assertion counts: with two instances, sleep comes back when the last cup goes off.
 - A Mac with its lid closed in a bag does not cool well. Turn the cup off before you pack it.
